@@ -20,7 +20,7 @@ public class NonBlockingQueueTest {
     }
 
     private static Queue<Integer> createQueue() {
-        return new NonBlockingQueue<>();
+        return new LockFreeQueue<>();
     }
 
     @Test

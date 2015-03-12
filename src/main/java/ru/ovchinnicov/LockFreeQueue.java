@@ -1,4 +1,4 @@
-package ru.ovchinnikov;
+package ru.ovchinnicov;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -21,10 +21,10 @@ public class LockFreeQueue<T> implements Queue<T> {
             oldTail = tail.get();
             Node<T> afterTail = oldTail.next.get();
             if (afterTail != null) {
-                tail.compareAndSet(oldTail, afterTail);
+                tail.weakCompareAndSet(oldTail, afterTail);
                 continue;
             }
-            if (oldTail.next.compareAndSet(null, newNode)) {
+            if (oldTail.next.weakCompareAndSet(null, newNode)) {
                 break;
             }
         }
@@ -52,16 +52,15 @@ public class LockFreeQueue<T> implements Queue<T> {
                 return null;
             }
             if (oldHead == tail.get()) {
-                tail.compareAndSet(oldHead, newHead);
+                tail.weakCompareAndSet(oldHead, newHead);
                 continue;
             }
             result = newHead.value;
-            if (head.compareAndSet(oldHead, newHead)) {
-                break;
+            if (head.weakCompareAndSet(oldHead, newHead)) {
+                --size;
+                return result;
             }
         }
-        --size;
-        return result;
     }
 
     public int size() {

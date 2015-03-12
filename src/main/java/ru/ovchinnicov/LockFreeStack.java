@@ -1,4 +1,4 @@
-package ru.ovchinnikov;
+package ru.ovchinnicov;
 
 import java.util.concurrent.atomic.AtomicReference;
 
