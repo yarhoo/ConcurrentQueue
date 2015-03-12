@@ -23,7 +23,7 @@ class BlockingQueue<T> implements Queue<T> {
         }
     }
 
-    public T remove() throws InterruptedException {
+    public T poll() throws InterruptedException {
         lock.readLock().lock();
         try {
             while(queue.isEmpty()) {

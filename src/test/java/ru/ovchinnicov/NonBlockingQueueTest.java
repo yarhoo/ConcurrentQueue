@@ -2,8 +2,8 @@ package ru.ovchinnicov;
 
 import org.junit.Test;
 
+//import java.util.Queue;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -13,28 +13,32 @@ public class NonBlockingQueueTest {
 
     @Test
     public void testAdd() throws Exception {
-        NonBlockingQueue<Integer> q = new NonBlockingQueue<Integer>();
+        Queue<Integer> q = createQueue();
         for (int i = 0; i < 10_000; i++) {
             q.add(i);
         }
     }
 
+    private static Queue<Integer> createQueue() {
+        return new NonBlockingQueue<>();
+    }
+
     @Test
     public void testRemove() throws Exception {
-        NonBlockingQueue<Integer> q = new NonBlockingQueue<Integer>();
+        Queue<Integer> q = createQueue();
         int x = 2;
         q.add(x);
-        int y = q.remove();
+        int y = q.poll();
         assertEquals(x, y);
     }
 
     @Test
     public void testIsEmpty() throws Exception {
-        NonBlockingQueue<Integer> q = new NonBlockingQueue<Integer>();
+        Queue<Integer> q = createQueue();
         assertTrue(q.isEmpty());
         q.add(2);
         assertFalse(q.isEmpty());
-        q.remove();
+        q.poll();
         assertTrue(q.isEmpty());
     }
 
@@ -62,16 +66,18 @@ public class NonBlockingQueueTest {
     private static void runConcurrent(int writers, int readers) throws ExecutionException, InterruptedException, TimeoutException {
         ExecutorService executor = Executors.newFixedThreadPool(readers + writers);
         CountDownLatch start = new CountDownLatch(1);
-        Queue<Integer> queue = new NonBlockingQueue<>();
-        List<Future<List<Integer>>> res = prepareAdders(writers, executor, start, queue);
-        prepareRemovers(readers, executor, start, queue);
+        CountDownLatch stop = new CountDownLatch(0);
+        Queue<Integer> queue = createQueue();
+        prepareAdders(writers, executor, start, stop, queue);
+        List<Future<List<Integer>>> res = prepareRemovers(readers, executor, start, queue);
         start.countDown();
+        stop.await();
         List<Integer> results = new ArrayList<>();
         for (Future<List<Integer>> future : res) {
             results.addAll(future.get(10, TimeUnit.SECONDS));
         }
         Integer q;
-        while((q = queue.remove()) != null) {
+        while ((q = queue.poll()) != null) {
             results.add(q);
         }
 //        assertEquals("writers: " + writers + " readers: " + readers, 1000 * writers, results.size());
@@ -83,45 +89,49 @@ public class NonBlockingQueueTest {
         executor.shutdownNow();
     }
 
-    private static List<Future<List<Integer>>> prepareAdders(int addersNo, ExecutorService executor,
-                                      CountDownLatch start, Queue<Integer> queue) {
-        List<Future<List<Integer>>> ret = new ArrayList<>();
+    private static void prepareAdders(int addersNo, ExecutorService executor,
+                                      CountDownLatch stop, CountDownLatch start,
+                                      Queue<Integer> queue) {
         for (int i = 0; i < addersNo; i++) {
-            ret.add(executor.submit(new Adder(start, queue)));
+            executor.submit(new Adder(start, stop, queue));
+        }
+    }
+
+    private static List<Future<List<Integer>>> prepareRemovers(int removersNo, ExecutorService executor,
+                                                               CountDownLatch start, Queue<Integer> queue) {
+        List<Future<List<Integer>>> ret = new ArrayList<>();
+        for (int i = 0; i < removersNo; i++) {
+            ret.add(executor.submit(new Remover(start, queue)));
         }
         return ret;
     }
 
-    private static void prepareRemovers(int removersNo, ExecutorService executor,
-                                        CountDownLatch start, Queue<Integer> queue) {
-        for (int i = 0; i < removersNo; i++) {
-            executor.submit(new Remover(start, queue));
-        }
-    }
-
-    private static class Adder implements Callable<List<Integer>> {
+    private static class Adder implements Callable<Void> {
         private final CountDownLatch start;
+        private final CountDownLatch stop;
         private final Queue<Integer> queue;
-        private final List<Integer> removed = new ArrayList<>();
 
-        private Adder(CountDownLatch l, Queue<Integer> q) {
+        private Adder(CountDownLatch l, CountDownLatch stop, Queue<Integer> q) {
             this.start = l;
+            this.stop = stop;
             this.queue = q;
         }
 
         @Override
-        public List<Integer> call() throws Exception {
+        public Void call() throws Exception {
             start.await();
             for (int i = 0; i < 1000; i++) {
-                removed.add(queue.remove());
+                queue.add(i);
             }
-            return removed;
+            stop.countDown();
+            return null;
         }
     }
 
     private static class Remover implements Callable<List<Integer>> {
         private final CountDownLatch start;
         private final Queue<Integer> queue;
+        private final List<Integer> removed = new ArrayList<>();
 
         private Remover(CountDownLatch l, Queue<Integer> q) {
             this.start = l;
@@ -132,9 +142,9 @@ public class NonBlockingQueueTest {
         public List<Integer> call() throws Exception {
             start.await();
             for (int i = 0; i < 1000; i++) {
-                queue.add(i);
+                removed.add(queue.poll());
             }
-            return null;
+            return removed;
         }
     }
 }

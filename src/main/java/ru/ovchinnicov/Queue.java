@@ -17,10 +17,10 @@ interface Queue<T> {
     /**
      * Removes and returns element from the beginning of queue
      *
-     * @return element from the beginning of queue
+     * @return element from the beginning of queue or null if the queue is empty
      * @throws InterruptedException when removing thread interrupted
      */
-    T remove() throws InterruptedException;
+    T poll() throws InterruptedException;
 
     /**
      * Checks if queue is empty

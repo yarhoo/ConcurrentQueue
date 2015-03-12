@@ -51,7 +51,7 @@ class NonBlockingQueue<T> implements Queue<T> {
      * {@inheritDoc}
      */
     @Override
-    public T remove() throws InterruptedException {
+    public T poll() throws InterruptedException {
         while (true) {
             Node<T> h = head.get();
             T value = h.value();
